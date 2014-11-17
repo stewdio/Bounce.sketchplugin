@@ -71,12 +71,17 @@ if( selection.count() > 0 ) inspect( selection[0] )
 function Ball(){
 
 	var
-	style, stylePart,
+	style, fill,
 	hue, saturation, value, rgb,
-	ballFrame,
-	edge
+	ballFrame
+
+
+	//  This is for our own silly records.
 
 	this.index = balls.length
+
+
+	//  This is the mathy-math we need to keep track of.
 
 	this.x  = Math.random() * canvas.frame().width()
 	this.y  = canvas.frame().height() / 2 + Math.random() * canvas.frame().height() / 2
@@ -84,12 +89,28 @@ function Ball(){
 	this.vy = ( 20 + Math.random() * 20 ) * -1
 	this.r  =   20 + Math.random() * 40
 
-	this.shape = balls.group.addLayerOfType( 'rectangle' )
-	this.shape.setName( 'Ball ' + ( balls.length + 1 ))
-	
 
-	style = this.shape.style().fills()
-	stylePart = style.addNewStylePart()
+	//  Now we have our actual dot Shape.
+
+	this.shape = MSOvalShape.alloc().init()
+	this.shape.setName( 'Ball ' + ( balls.length + 1 ))
+	this.shape.frame = MSRect.rectWithRect( NSMakeRect( 0, 0, this.r * 2, this.r * 2 ))
+
+
+	//  But the shape itself is rather primative
+	//  and must be housed inside a Shape Group.
+	//  This is what we’ll actually move about the artboard.
+	//  Also: Shape Groups can have style!
+
+	this.shapeGroup = this.shape.embedInShapeGroup()
+	this.shapeGroup.frame().setX( this.x - this.r )
+	this.shapeGroup.frame().setY( this.y - this.r )
+
+
+	//  Let’s set the Blending Mode to 'Multiply.'
+
+	style = this.shapeGroup.style()
+	style.contextSettings().setBlendMode( 2 )
 
 
 	//  Color it!
@@ -97,44 +118,25 @@ function Ball(){
 	//  with a random Hue and full-on Saturation and Value
 	//  than by using random Red, Green, and Blue channel values.
 	//  Then we just convert from HSV to RGB.
-
-	hue        = Math.random()
-	saturation = 1.0
-	value      = 1.0
-	rgb        = HSVtoRGB( hue, saturation, value )
-	stylePart.color = [MSColor colorWithRed:rgb.r green:rgb.g blue:rgb.b alpha:0.95]
-	stylePart.fillType = 0
-
-
-	//  Let’s set the Blending Mode to 'Multiply.'
-	//  It seems we can do this either on the Layer’s overall Style
-	//  or within the Style’s specific Fill settings
-	//  but I couldn’t get the latter to work. So forget it.
-
-	this.shape.style().contextSettings().setBlendMode( 2 )
+	
+	hue           = Math.random()
+	saturation    = 1.0
+	value         = 1.0
+	rgb           = HSVtoRGB( hue, saturation, value )
+	fill          = style.fills().addNewStylePart()
+	fill.color    = [MSColor colorWithRed:rgb.r green:rgb.g blue:rgb.b alpha:0.95]
+	fill.fillType = 0
 
 
-	//  Set position and dimensions.
-	//  Looks like the XY refers to the upper left corner
-	//  so in order to use this as a center coordinate
-	//  we need to subtract the shape radius (r) from XY.
+	//  We’re all done creating our Ball.
+	//  Let’s add the Shape Group (which contains the Shape)
+	//  to our group folder on the artboard.
 
-	ballFrame = this.shape.frame()
-	ballFrame.setX( this.x - this.r )
-	ballFrame.setY( this.y - this.r )
-	ballFrame.setWidth(  this.r * 2 )
-	ballFrame.setHeight( this.r * 2 )
+	balls.group.addLayers([ this.shapeGroup ])
+	
 
-
-	//  Fixing the border radius is more painful...
-	//  We have to access the actual Path within our Dot Layer
-	//  and also have to force a recalculation / redraw.
-	//  Why is it called fixedRadius instead of borderRadius
-	//  or just plain radius?
-
-	edge = this.shape.layers().firstObject()
-	edge.setFixedRadius( this.r )
-	edge.resetPointsBasedOnUserInteraction()
+	//  And push a reference of our Ball into an Array
+	//  for easy management later.
 
 	balls.push( this )
 }
@@ -147,12 +149,12 @@ function Ball(){
 Ball.prototype.update = function(){
 
 	this.x += this.vx
-	if( this.x < 0 || this.x > canvas.frame().width() ) this.vx *= -1
-	this.shape.frame().setX( this.x - this.r )
+	if( this.x - this.r < 0 || this.x + this.r > canvas.frame().width() ) this.vx *= -1
+	this.shapeGroup.frame().setX( this.x - this.r )
 	
 	this.y += this.vy
-	if( this.y < 0 || this.y > canvas.frame().height() ) this.vy *= -1
-	this.shape.frame().setY( this.y - this.r )
+	if( this.y - this.r < 0 || this.y + this.r > canvas.frame().height() ) this.vy *= -1
+	this.shapeGroup.frame().setY( this.y - this.r )
 }
 
 
