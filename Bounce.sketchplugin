@@ -72,8 +72,7 @@ function Ball(){
 
 	var
 	style, fill,
-	hue, saturation, value, rgb,
-	ballFrame
+	hue, saturation, value, rgb
 
 
 	//  This is for our own silly records.
@@ -169,20 +168,58 @@ Ball.prototype.update = function(){
 //  and “balls” as plural for dealing with all. Just reads nicer.
 
 var balls = []
+
 balls.group = canvas.addLayerOfType( 'group' )
 balls.group.setName( 'Balls' )
 balls.group.frame().setWidth( canvas.frame().width() )
 balls.group.frame().setHeight( canvas.frame().height() )
 balls.frame = 0
 balls.framesAllowed = 200
+balls.arePaused = false
 
-
-//  Look how tidy instance creation can be ;)
 
 balls.create = function( total ){
 
+
+	//  Look how tidy instance creation can be ;)
+
 	if( total === undefined ) total = 12
 	while( total -- ) new Ball()
+
+
+	//  You know what would be cool? 
+	//  If we could Pause or Stop the animation by selecting
+	//  buttons on the side of the Artboard!
+
+	var
+	shape, shapeGroup,
+	style, fill
+
+
+	//  Pause button
+
+	shape = MSRectangleShape.alloc().init()
+	shape.setName( 'Balls Pause' )
+	shape.frame = MSRect.rectWithRect( NSMakeRect( 0, 0, 60, 60 ))
+	shapeGroup = shape.embedInShapeGroup()
+	shapeGroup.frame().setX(( artboard.frame().width() + 60 ))
+	shapeGroup.frame().setY( 30 )
+	fill = shapeGroup.style().fills().addNewStylePart()
+	fill.color = MSColor.colorWithSVGString( '#FFCC00' )
+	page.addLayers([ shapeGroup ])
+
+
+	//  Stop button
+
+	shape = MSRectangleShape.alloc().init()
+	shape.setName( 'Balls Stop' )
+	shape.frame = MSRect.rectWithRect( NSMakeRect( 0, 0, 60, 60 ))
+	shapeGroup = shape.embedInShapeGroup()
+	shapeGroup.frame().setX( artboard.frame().width() + 60 )
+	shapeGroup.frame().setY( 120 )
+	fill = shapeGroup.style().fills().addNewStylePart()
+	fill.color = MSColor.colorWithSVGString( '#DD0000' )
+	page.addLayers([ shapeGroup ])
 }
 
 
@@ -190,49 +227,71 @@ balls.create = function( total ){
 
 balls.update = function( interval ){
 
-	balls.forEach( function( ball ){
 
-		ball.update()
-	})
+	//  We need to updated and redraw all the Balls.
+	//  That is, if we’re not paused!
+
+	if( balls.arePaused === false ){
+
+		balls.forEach( function( ball ){
+
+			ball.update()
+		})
+		balls.frame ++
 
 
-	//  We need to force a redraw 
-	//  otherwise Sketch doesn’t bother to move the balls.
-	//  This seems to do the trick.
+		//  We need to force a redraw 
+		//  otherwise Sketch doesn’t bother to move the balls.
+		//  This seems to do the trick.
 
-	canvas.setHasBackgroundColor( false )
-	canvas.setHasBackgroundColor( true )
+		canvas.setHasBackgroundColor( false )
+		canvas.setHasBackgroundColor( true )
+	}
 	
 
-	//  WTF. I had this idea to make a STOP button
-	//  but for some reason we can’t seem to detect changes in selection
-	//  from inside this loop. 
-	//  selection.count() will always equal whatever it was
-	//  prior to the loop :(
+	//  Here we check to see if our UI buttons are selected.
+	//  This is my first stab at it—probably more efficient to use a
+	//  .isSelected() kind of thing... Will look further into it.
 
-	//log( 'Number of selected items: '+ selection.count())
-	//if( selection.count() > 0 ){
-	//
-	// 	log( selection[0])
-	// 	inspect(selection)
-	// 	log( 'User has selected the Balls.group which is our signal to knock it off.' )
+	var 
+	selected   = MSDocument.currentDocument().findSelectedLayers(), s,
+	wantsStop  = false,
+	wantsPause = false
+
+	//  A user can select multiple things at once of course
+	//  so we want to prioritize STOP, then PAUSE, then PLAY.
+	//  For example, if you selected all 3 we’d just stop.
+
+	//  Also WOW WOW WOW OMG LISTEN TO THIS:
+	//  We CANNOT use a triple equals here when comparing Strings
+	//  because the Strings returned from .name() are NOT regular
+	//  JavaScript Strings! They are == but not ===. You dig?
+	//  Banged my head a few times before I caught that little gem.
+
+	if( selected.count() > 0 ){
+
+		for( s = 0; s < selected.count(); s ++ ){
+
+			if( selected[ s ].name() == 'Balls Stop'  ) wantsStop  = true
+			if( selected[ s ].name() == 'Balls Pause' ) wantsPause = true
+		}
+	}
+	if( wantsStop === true ) return interval.cancel()
+	else if( wantsPause === true ) balls.arePaused = true
+	else balls.arePaused = false
+
+
+	//  This is some old code for automatically killing the demo.
+	
+	// if( balls.frame % 50 === 0 && verbose ){
+
+	// 	log( 'We’ve animated for '+ balls.frame +' frames so far with '+ (balls.framesAllowed - balls.frame) +' more frames to go.' )
+	// }
+	// if( balls.frame > balls.framesAllowed ){
+		
+	// 	if( verbose ) log( 'Ok. Time for us to cancel this animation loop.' )
 	// 	interval.cancel()
 	// }
-
-
-	//  So instead we’ll just run this animation 
-	//  a limited number of times...
-
-	balls.frame ++
-	if( balls.frame % 50 === 0 && verbose ){
-
-		log( 'We’ve animated for '+ balls.frame +' frames so far with '+ (balls.framesAllowed - balls.frame) +' more frames to go.' )
-	}
-	if( balls.frame > balls.framesAllowed ){
-		
-		if( verbose ) log( 'Ok. Time for us to cancel this animation loop.' )
-		interval.cancel()
-	}
 }
 
 
