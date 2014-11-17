@@ -1,0 +1,346 @@
+
+
+//  Bounce.sketchplugin
+
+//  Stewart Smith
+//  Twitter @stewd_io
+//  Web      stewd.io
+//  GitHub   stewdio
+
+
+var verbose = true
+
+
+
+
+
+
+
+
+//  Let’s get going.
+
+if( verbose ) log( '// /  /    /        /                /                                /' )
+
+
+//  Get the current “canvas”
+//  and its dimensions.
+
+var 
+page = doc.currentPage(),
+artboard = page.currentArtboard() || ( page.artboards().count() ? page.artboards()[0] : null ),
+artboardFrame,
+canvas, canvasFrame
+
+if( artboard ){
+
+	if( verbose ) log( 'We’re going to reuse an existing artboard as our canvas.' )
+	canvas = artboard
+}
+else {
+
+	if( verbose ) log( 'No artboard exists so we’re going to create a new one to use as our canvas.' )
+	artboard = MSArtboardGroup.new()
+	artboard.setName( 'Bounce board' )
+	artboard.frame().setWidth(  600 )
+	artboard.frame().setHeight( 400 )
+	page.addLayer( artboard )
+	canvas = artboard	
+}
+canvasFrame = canvas.frame()
+if( verbose ) log( 'Our canvas is named “'+ canvas.name() +'” and is '+ canvasFrame.width() +' × '+ canvasFrame.height() +'.' )
+
+
+//  Seemed like a good idea to bake this right in
+//  since I’ve had to do so much guess and check work
+//  with creating Paths in Sketch:
+
+if( selection.count() > 0 ) inspect( selection[0] )
+
+
+
+
+
+
+
+
+//  Here’s our Ball class which handles what you would expect
+//  and also pushes the instance it creates into balls[]
+//  so it’s really easy to deal with all instances at once.
+//  (You’ll see more of what I mean below when we define balls[].)
+
+function Ball(){
+
+	var
+	style, stylePart,
+	hue, saturation, value, rgb,
+	ballFrame,
+	edge
+
+	this.index = balls.length
+
+	this.x  = Math.random() * canvas.frame().width()
+	this.y  = canvas.frame().height() / 2 + Math.random() * canvas.frame().height() / 2
+	this.vx = ( 20 + Math.random() * 20 ) * ( Math.floor( Math.random() * 2 ) === 0 ? 1 : -1 )
+	this.vy = ( 20 + Math.random() * 20 ) * -1
+	this.r  =   20 + Math.random() * 40
+
+	this.shape = balls.group.addLayerOfType( 'rectangle' )
+	this.shape.setName( 'Ball ' + ( balls.length + 1 ))
+	
+
+	style = this.shape.style().fills()
+	stylePart = style.addNewStylePart()
+
+
+	//  Color it!
+	//  We’re going to get much more vibrant color by using HSV 
+	//  with a random Hue and full-on Saturation and Value
+	//  than by using random Red, Green, and Blue channel values.
+	//  Then we just convert from HSV to RGB.
+
+	hue        = Math.random()
+	saturation = 1.0
+	value      = 1.0
+	rgb        = HSVtoRGB( hue, saturation, value )
+	stylePart.color = [MSColor colorWithRed:rgb.r green:rgb.g blue:rgb.b alpha:0.95]
+	stylePart.fillType = 0
+
+
+	//  Let’s set the Blending Mode to 'Multiply.'
+	//  It seems we can do this either on the Layer’s overall Style
+	//  or within the Style’s specific Fill settings
+	//  but I couldn’t get the latter to work. So forget it.
+
+	this.shape.style().contextSettings().setBlendMode( 2 )
+
+
+	//  Set position and dimensions.
+	//  Looks like the XY refers to the upper left corner
+	//  so in order to use this as a center coordinate
+	//  we need to subtract the shape radius (r) from XY.
+
+	ballFrame = this.shape.frame()
+	ballFrame.setX( this.x - this.r )
+	ballFrame.setY( this.y - this.r )
+	ballFrame.setWidth(  this.r * 2 )
+	ballFrame.setHeight( this.r * 2 )
+
+
+	//  Fixing the border radius is more painful...
+	//  We have to access the actual Path within our Dot Layer
+	//  and also have to force a recalculation / redraw.
+	//  Why is it called fixedRadius instead of borderRadius
+	//  or just plain radius?
+
+	edge = this.shape.layers().firstObject()
+	edge.setFixedRadius( this.r )
+	edge.resetPointsBasedOnUserInteraction()
+
+	balls.push( this )
+}
+
+
+//  Our individual instances don’t need their own .update()
+//  when they can just inherit it from the Class, right?
+//  Is this just splitting hairs?!?
+
+Ball.prototype.update = function(){
+
+	this.x += this.vx
+	if( this.x < 0 || this.x > canvas.frame().width() ) this.vx *= -1
+	this.shape.frame().setX( this.x - this.r )
+	
+	this.y += this.vy
+	if( this.y < 0 || this.y > canvas.frame().height() ) this.vy *= -1
+	this.shape.frame().setY( this.y - this.r )
+}
+
+
+
+
+//  Here I’m going to create an Array called balls[]
+//  and overload it with whatever bits we want 
+//  which will handle all the Balls we make.
+//  We could have instead added these bits to the Ball class itself
+//  like Ball.all = [], Ball.group = canvas.addLayerOfType( 'group' ), etc.
+//  but I really like “Ball” as a singular for dealing with one ball
+//  and “balls” as plural for dealing with all. Just reads nicer.
+
+var balls = []
+balls.group = canvas.addLayerOfType( 'group' )
+balls.group.setName( 'Balls' )
+balls.group.frame().setWidth( canvas.frame().width() )
+balls.group.frame().setHeight( canvas.frame().height() )
+balls.frame = 0
+balls.framesAllowed = 200
+
+
+//  Look how tidy instance creation can be ;)
+
+balls.create = function( total ){
+
+	if( total === undefined ) total = 12
+	while( total -- ) new Ball()
+}
+
+
+//  Updating Ball coordinates is also tidy.
+
+balls.update = function( interval ){
+
+	balls.forEach( function( ball ){
+
+		ball.update()
+	})
+
+
+	//  We need to force a redraw 
+	//  otherwise Sketch doesn’t bother to move the balls.
+	//  This seems to do the trick.
+
+	canvas.setHasBackgroundColor( false )
+	canvas.setHasBackgroundColor( true )
+	
+
+	//  WTF. I had this idea to make a STOP button
+	//  but for some reason we can’t seem to detect changes in selection
+	//  from inside this loop. 
+	//  selection.count() will always equal whatever it was
+	//  prior to the loop :(
+
+	//log( 'Number of selected items: '+ selection.count())
+	//if( selection.count() > 0 ){
+	//
+	// 	log( selection[0])
+	// 	inspect(selection)
+	// 	log( 'User has selected the Balls.group which is our signal to knock it off.' )
+	// 	interval.cancel()
+	// }
+
+
+	//  So instead we’ll just run this animation 
+	//  a limited number of times...
+
+	balls.frame ++
+	if( balls.frame % 50 === 0 && verbose ){
+
+		log( 'We’ve animated for '+ balls.frame +' frames so far with '+ (balls.framesAllowed - balls.frame) +' more frames to go.' )
+	}
+	if( balls.frame > balls.framesAllowed ){
+		
+		if( verbose ) log( 'Ok. Time for us to cancel this animation loop.' )
+		interval.cancel()
+	}
+}
+
+
+
+
+
+
+
+
+//  Ok. We have all our dominoes lined up. 
+//  Let’s create the balls:
+
+balls.create()
+
+
+//  Finally, let’s create a looper (like “setInterval” for you browser peeps)
+//  and we pass it 2 arguments:
+//  1: the interval time in seconds
+//  2: our balls.update() function.
+//  If you were looking to do a simple setTimeout rather than setInterval
+//  you would use .scheduleWithInterval_jsFunction() instead
+//  which expects the same 2 argument types.
+
+//  Sadly I’ve noticed on my own setup 
+//  if I try to go faster than 0.2 seconds per interval
+//  Sketch crashes immediately. Not sure why.
+//  Hence the really choppy frame rate. (Sorry!)
+
+coscript.shouldKeepAround = true
+coscript.scheduleWithRepeatingInterval_jsFunction( 0.2, balls.update )
+
+
+
+
+
+
+
+
+
+
+
+
+//  Convert an HSV color model (Hue, Saturation, Value)
+//  into an RGB one (Red, Green, Blue).
+//  Accepts values from 0 to 1 inclusive
+//  and returns likewise.
+//  Check out my sweet Array literal return expression ;)
+
+function HSVtoRGB( h, s, v ){
+
+	var i, f, p, q, t, r, g, b
+	
+	i = Math.floor( h * 6 )
+	f = h * 6 - i
+	p = v * ( 1 - s )
+	q = v * ( 1 - f * s )
+	t = v * ( 1 - ( 1 - f ) * s )
+	
+	return [
+
+		{ r: v, g: t, b: p },
+		{ r: q, g: v, b: p },
+		{ r: p, g: v, b: t },
+		{ r: p, g: q, b: v },
+		{ r: t, g: p, b: v },
+		{ r: v, g: p, b: q }
+
+	][ i % 6 ]
+}
+
+
+
+
+//  Object inspection,
+//  copied from github.com/sketchplugins/plugin-requests
+
+function inspect( obj ){
+
+	if( obj === undefined ) obj = doc.currentPage().currentArtboard()
+
+	log( ' ' )
+	log( '============================================================' )
+	log( 'Object   '+ obj )
+	log( 'of Class '+ [obj className] )
+	log( '------------------------------------------------------------' )
+	log( '.properties' )
+	log( [obj class].mocha().properties() )
+	log( '.propertiesWithAncestors' )
+	log( [obj class].mocha().propertiesWithAncestors() )
+	log( '------------------------------------------------------------' )
+	log( '.classMethods' )
+	log( [obj class].mocha().classMethods() )
+	log( '.classMethodsWithAncestors' )
+	log( [obj class].mocha().classMethodsWithAncestors() )
+	log( '------------------------------------------------------------' )
+	log( '.instanceMethods' )
+	log( [obj class].mocha().instanceMethods() )
+	log( '.instanceMethodsWithAncestors' )
+	log( [obj class].mocha().instanceMethodsWithAncestors() )
+	log( '------------------------------------------------------------' )
+	log( '.protocols' )
+	log( [obj class].mocha().protocols() )
+	log( '.protocolsWithAncestors' )
+	log( [obj class].mocha().protocolsWithAncestors() )
+	log( '------------------------------------------------------------' )
+	log( '.treeAsDictionary()' )
+	log( obj.treeAsDictionary() )
+	log( '============================================================' )
+	log( ' ' )
+}
+
+
+
