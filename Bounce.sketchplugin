@@ -96,7 +96,7 @@ function Ball(){
 	this.shape.frame = MSRect.rectWithRect( NSMakeRect( 0, 0, this.r * 2, this.r * 2 ))
 
 
-	//  But the shape itself is rather primative
+	//  But the shape itself is rather primitive
 	//  and must be housed inside a Shape Group.
 	//  This is what we’ll actually move about the artboard.
 	//  Also: Shape Groups can have style!
@@ -228,7 +228,7 @@ balls.create = function( total ){
 balls.update = function( interval ){
 
 
-	//  We need to updated and redraw all the Balls.
+	//  We need to update and redraw all the Balls.
 	//  That is, if we’re not paused!
 
 	if( balls.arePaused === false ){
@@ -259,8 +259,8 @@ balls.update = function( interval ){
 	wantsPause = false
 
 	//  A user can select multiple things at once of course
-	//  so we want to prioritize STOP, then PAUSE, then PLAY.
-	//  For example, if you selected all 3 we’d just stop.
+	//  so we want to prioritize STOP over PAUSE.
+	//  For example, if you selected both we’d just stop.
 
 	//  Also WOW WOW WOW OMG LISTEN TO THIS:
 	//  We CANNOT use a triple equals here when comparing Strings
