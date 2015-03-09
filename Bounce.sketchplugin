@@ -43,8 +43,16 @@ else {
 	artboard.setName( 'Bounce board' )
 	artboard.frame().setWidth(  600 )
 	artboard.frame().setHeight( 400 )
-	page.addLayer( artboard )
-	canvas = artboard	
+	
+
+	//  Little bit of Sketch version-handling here...
+
+	if( page.addLayer )
+		page.addLayer( artboard )
+	else
+		page.addLayers([ artboard ])
+	
+	canvas = artboard
 }
 canvasFrame = canvas.frame()
 if( verbose ) log( 'Our canvas is named “'+ canvas.name() +'” and is '+ canvasFrame.width() +' × '+ canvasFrame.height() +'.' )
